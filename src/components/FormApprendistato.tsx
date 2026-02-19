@@ -9,6 +9,8 @@ export default function FormApprendistato({ apprendistato, onSalva, onChiudi }: 
   const [dipendenti, setDipendenti] = useState<any[]>([])
   const [aziende, setAziende] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [nuovoDip, setNuovoDip] = useState(false)
+  const [newDip, setNewDip] = useState({ cognome_nome: '', codice_fiscale: '', mansione: '', email: '' })
   const [form, setForm] = useState({
     dipendente_id: '',
     azienda_id: '',
@@ -55,6 +57,28 @@ export default function FormApprendistato({ apprendistato, onSalva, onChiudi }: 
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  async function creaNuovoDipendente() {
+    if (!newDip.cognome_nome || !form.azienda_id) {
+      alert("Inserisci almeno il nome e seleziona prima l'azienda")
+      return
+    }
+    const { data, error } = await supabase.from('dipendenti').insert({
+      cognome_nome: newDip.cognome_nome.trim(),
+      codice_fiscale: newDip.codice_fiscale.trim().toUpperCase() || null,
+      mansione: newDip.mansione.trim() || null,
+      email: newDip.email.trim() || null,
+      azienda_id: form.azienda_id,
+      attivo: true,
+    }).select().single()
+
+    if (error) { alert('Errore nella creazione del dipendente'); return }
+
+    await caricaDati()
+    set('dipendente_id', data.id)
+    setNuovoDip(false)
+    setNewDip({ cognome_nome: '', codice_fiscale: '', mansione: '', email: '' })
+  }
+
   async function salva() {
     if (!form.dipendente_id || !form.azienda_id) {
       alert('Compila i campi obbligatori: Azienda e Dipendente')
@@ -70,67 +94,162 @@ export default function FormApprendistato({ apprendistato, onSalva, onChiudi }: 
     onSalva()
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    border: '1px solid #e2e8f0', borderRadius: '8px',
+    padding: '9px 12px', fontSize: '13px', color: '#0f172a',
+    outline: 'none', background: 'white',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '12px', fontWeight: '600',
+    color: '#374151', marginBottom: '5px',
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-screen overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-bold">{apprendistato ? 'Modifica Apprendista' : 'Nuovo Apprendista'}</h2>
-          <button onClick={onChiudi} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
-        </div>
-        <div className="p-6 grid grid-cols-2 gap-4">
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '16px' }}>
+      <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Azienda *</label>
-            <select className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.azienda_id} onChange={e => { set('azienda_id', e.target.value); set('dipendente_id', '') }}>
+            <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0f172a' }}>
+              {apprendistato ? 'Modifica Apprendista' : 'Nuovo Apprendista'}
+            </h2>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>Compila i campi obbligatori *</p>
+          </div>
+          <button onClick={onChiudi} style={{ background: 'none', border: 'none', fontSize: '22px', color: '#94a3b8', cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+          {/* Azienda */}
+          <div>
+            <label style={labelStyle}>Azienda *</label>
+            <select style={{ ...inputStyle, cursor: 'pointer' }}
+              value={form.azienda_id}
+              onChange={e => { set('azienda_id', e.target.value); set('dipendente_id', ''); setNuovoDip(false) }}
+            >
               <option value="">Seleziona azienda</option>
               {aziende.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
             </select>
           </div>
+
+          {/* Apprendista */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Apprendista *</label>
-            <select className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.dipendente_id} onChange={e => set('dipendente_id', e.target.value)}>
-              <option value="">Seleziona dipendente</option>
+            <label style={labelStyle}>Apprendista *</label>
+            <select style={{ ...inputStyle, cursor: 'pointer' }}
+              value={form.dipendente_id}
+              onChange={e => {
+                if (e.target.value === '__nuovo__') { setNuovoDip(true); set('dipendente_id', '') }
+                else set('dipendente_id', e.target.value)
+              }}
+            >
+              <option value="">Seleziona apprendista</option>
               {dipendentiFiltrati.map(d => <option key={d.id} value={d.id}>{d.cognome_nome}</option>)}
+              <option value="__nuovo__">➕ Aggiungi nuovo apprendista...</option>
             </select>
           </div>
+
+          {/* Mini-form nuovo dipendente */}
+          {nuovoDip && (
+            <div style={{ gridColumn: '1 / -1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0369a1', marginBottom: '12px' }}>
+                ➕ Nuovo Apprendista
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ ...labelStyle, color: '#0369a1' }}>Nome e Cognome *</label>
+                  <input style={inputStyle} placeholder="Es. Rossi Mario"
+                    value={newDip.cognome_nome}
+                    onChange={e => setNewDip(d => ({ ...d, cognome_nome: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, color: '#0369a1' }}>Codice Fiscale</label>
+                  <input style={{ ...inputStyle, textTransform: 'uppercase' }} placeholder="Es. RSSMRA80A01H703Z"
+                    value={newDip.codice_fiscale}
+                    onChange={e => setNewDip(d => ({ ...d, codice_fiscale: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, color: '#0369a1' }}>Mansione</label>
+                  <input style={inputStyle} placeholder="Es. Operaio"
+                    value={newDip.mansione}
+                    onChange={e => setNewDip(d => ({ ...d, mansione: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, color: '#0369a1' }}>Email</label>
+                  <input style={inputStyle} placeholder="Es. mario@azienda.it"
+                    value={newDip.email}
+                    onChange={e => setNewDip(d => ({ ...d, email: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={creaNuovoDipendente}
+                  style={{ background: '#0369a1', color: 'white', border: 'none', borderRadius: '7px', padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  Salva apprendista
+                </button>
+                <button onClick={() => setNuovoDip(false)}
+                  style={{ background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '7px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer' }}>
+                  Annulla
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Date contratto */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data Inizio Contratto</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.data_inizio} onChange={e => set('data_inizio', e.target.value)} />
+            <label style={labelStyle}>Data Inizio Contratto</label>
+            <input type="date" style={inputStyle} value={form.data_inizio} onChange={e => set('data_inizio', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data Fine Contratto</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.data_fine_contratto} onChange={e => set('data_fine_contratto', e.target.value)} />
+            <label style={labelStyle}>Data Fine Contratto</label>
+            <input type="date" style={inputStyle} value={form.data_fine_contratto} onChange={e => set('data_fine_contratto', e.target.value)} />
+          </div>
+
+          {/* Annualità */}
+          <div>
+            <label style={labelStyle}>Annualità Consegnate</label>
+            <input style={inputStyle} value={form.annualita_consegnate} onChange={e => set('annualita_consegnate', e.target.value)} placeholder="Es. 1° e 2°" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Annualità Consegnate</label>
-            <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.annualita_consegnate} onChange={e => set('annualita_consegnate', e.target.value)} placeholder="es. 1° e 2°" />
+            <label style={labelStyle}>Annualità da Fare</label>
+            <input style={inputStyle} value={form.annualita_da_fare} onChange={e => set('annualita_da_fare', e.target.value)} placeholder="Es. 3° a Maggio" />
+          </div>
+
+          {/* Prossima scadenza e stato */}
+          <div>
+            <label style={labelStyle}>Prossima Scadenza</label>
+            <input type="date" style={inputStyle} value={form.prossima_scadenza} onChange={e => set('prossima_scadenza', e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Annualità da Fare</label>
-            <input className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.annualita_da_fare} onChange={e => set('annualita_da_fare', e.target.value)} placeholder="es. 3° a Maggio" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prossima Scadenza</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.prossima_scadenza} onChange={e => set('prossima_scadenza', e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stato</label>
-            <select className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={form.stato} onChange={e => set('stato', e.target.value)}>
-              <option value="ATTIVO">Attivo</option>
-              <option value="IN_SCADENZA">In scadenza</option>
-              <option value="SCADUTO">Scaduto</option>
-              <option value="CESSATO">Cessato</option>
-              <option value="COMPLETATO">Completato</option>
+            <label style={labelStyle}>Stato</label>
+            <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.stato} onChange={e => set('stato', e.target.value)}>
+              <option value="ATTIVO">✅ Attivo</option>
+              <option value="IN_SCADENZA">⚠️ In scadenza</option>
+              <option value="SCADUTO">❌ Scaduto</option>
+              <option value="CESSATO">🚫 Cessato</option>
+              <option value="COMPLETATO">🎓 Completato</option>
             </select>
           </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
-            <textarea className="w-full border border-gray-200 rounded-lg p-2 text-sm" rows={3} value={form.note} onChange={e => set('note', e.target.value)} placeholder="Note aggiuntive..." />
+
+          {/* Note */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>Note</label>
+            <textarea style={{ ...inputStyle, resize: 'vertical' }} rows={3} value={form.note} onChange={e => set('note', e.target.value)} placeholder="Note aggiuntive..." />
           </div>
         </div>
-        <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-          <button onClick={onChiudi} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Annulla</button>
-          <button onClick={salva} disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-            {loading ? 'Salvataggio...' : 'Salva'}
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button onClick={onChiudi} style={{ background: 'transparent', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', color: '#64748b', cursor: 'pointer' }}>
+            Annulla
+          </button>
+          <button onClick={salva} disabled={loading} style={{ background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: '600', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? 'Salvataggio...' : 'Salva Apprendista'}
           </button>
         </div>
       </div>
