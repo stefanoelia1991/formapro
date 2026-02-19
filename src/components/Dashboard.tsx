@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase, statoColore, statoLabel } from '../lib/supabase'
+import { supabase, statoLabel } from '../lib/supabase'
 import FormAttestato from './FormAttestato'
 import FormApprendistato from './FormApprendistato'
 import * as XLSX from 'xlsx'
